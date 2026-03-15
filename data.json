@@ -1,0 +1,55 @@
+[
+    {
+        "nom": "Fleur de Feu",
+        "provenance": "Nature",
+        "type": "Item",
+        "tags": [
+            "Feu",
+            "Plante"
+        ],
+        "quantite": "4",
+        "desc": "Une fleure enflammée.",
+        "ingredients": []
+    },
+    {
+        "nom": "Cailloux",
+        "provenance": "Nature",
+        "type": "Item",
+        "tags": [
+            "Terre",
+            "Solide"
+        ],
+        "quantite": "4",
+        "desc": "Kayou.",
+        "ingredients": []
+    },
+    {
+        "nom": "Épée",
+        "provenance": "Achat/Forge",
+        "type": "Arme",
+        "tags": [
+            "Fer",
+            "Solide",
+            "Tranchant"
+        ],
+        "quantite": "1",
+        "desc": "Average épée random.",
+        "ingredients": []
+    },
+    {
+        "nom": "Épée Enflammée",
+        "provenance": "Atelier Alchimique",
+        "type": "Arme Magique",
+        "tags": [
+            "Feu",
+            "Fer",
+            "Magie"
+        ],
+        "quantite": "1",
+        "desc": "Une épée qui brûle ses ennemis.",
+        "ingredients": [
+            "Épée",
+            "Fleur de Feu"
+        ]
+    }
+]
