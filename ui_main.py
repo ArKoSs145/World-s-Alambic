@@ -153,6 +153,7 @@ class WorldsAlambicApp(QMainWindow):
         
         top_bar_layout.addWidget(self.search_bar, 4)
         top_bar_layout.addWidget(self.btn_filter, 1)
+        # (Le bouton Ajouter a été retiré d'ici)
         
         self.db_list = QListWidget()
         self.db_list.setObjectName("inventory_list") 
@@ -160,8 +161,6 @@ class WorldsAlambicApp(QMainWindow):
         self.db_list.setWrapping(True)
         self.db_list.setResizeMode(QListWidget.ResizeMode.Adjust)
         self.db_list.setSpacing(8)
-        
-        # 👇 NOUVEAU : On écoute le clic gauche sur une carte pour afficher les détails !
         self.db_list.itemClicked.connect(self.afficher_details_panneau)
         
         left_layout.addLayout(top_bar_layout)
@@ -177,7 +176,6 @@ class WorldsAlambicApp(QMainWindow):
         details_layout.setContentsMargins(15, 15, 15, 15)
         details_layout.setSpacing(10)
 
-        # Les textes du panneau (vides par défaut)
         self.lbl_detail_nom = QLabel("Sélectionnez un artefact")
         self.lbl_detail_nom.setStyleSheet("font-size: 18px; color: #D4AF37; font-weight: bold;")
         self.lbl_detail_nom.setWordWrap(True)
@@ -191,27 +189,47 @@ class WorldsAlambicApp(QMainWindow):
         self.lbl_detail_desc.setWordWrap(True)
         self.lbl_detail_desc.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        # Le bouton de destruction (caché par défaut)
+        # 1. Bouton Supprimer (Caché par défaut)
         self.btn_supprimer = QPushButton("❌ Détruire cet artefact")
-        self.btn_supprimer.setStyleSheet("background-color: #7F1D1D; color: white; border: 1px solid #EF4444; padding: 8px;")
+        self.btn_supprimer.setStyleSheet("background-color: #7F1D1D; color: white; border: 1px solid #EF4444; padding: 8px; border-radius: 4px;")
         self.btn_supprimer.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_supprimer.hide() 
         self.btn_supprimer.clicked.connect(self.supprimer_artefact_selectionne)
 
-        # Ajout au layout du panneau
+        # 2. Bouton Ajouter (Toujours visible en bas)
+        self.btn_add = QPushButton("➕ Ajouter un artefact")
+        self.btn_add.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_add.setStyleSheet("background-color: #10B981; color: white; border: none; padding: 10px; font-weight: bold; border-radius: 4px;")
+        self.btn_add.clicked.connect(self.ajouter_artefact_manuel)
+
+        # Ordre d'ajout dans le panneau : la description pousse les boutons vers le bas
         details_layout.addWidget(self.lbl_detail_nom)
         details_layout.addWidget(self.lbl_detail_stats)
-        details_layout.addWidget(self.lbl_detail_desc, 1) # Le "1" pousse le bouton vers le bas
-        details_layout.addWidget(self.btn_supprimer)
+        details_layout.addWidget(self.lbl_detail_desc, 1) # Le "1" crée l'espace vide
+        details_layout.addWidget(self.btn_supprimer)      # Juste au-dessus
+        details_layout.addWidget(self.btn_add)            # Tout en bas
 
         # === ASSEMBLAGE FINAL ===
-        main_layout.addWidget(left_panel, 7) # 70% de la largeur
-        main_layout.addWidget(self.details_panel, 3) # 30% de la largeur
+        main_layout.addWidget(left_panel, 7) 
+        main_layout.addWidget(self.details_panel, 3) 
         
         self.tab_grimoire.setLayout(main_layout)
-        
-        # Variable pour mémoriser l'objet en cours de lecture
         self.artefact_en_lecture = None
+
+    def ajouter_artefact_manuel(self):
+        """Ouvre la fenêtre de création d'objet sans passer par le chaudron"""
+        
+        # On appelle notre boîte de dialogue existante avec une liste vide d'ingrédients []
+        dialog = CreationDialog([], self)
+        
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            nouvel_objet = dialog.get_data()
+            
+            # On sauvegarde et on rafraîchit !
+            self.db.save_item(nouvel_objet)
+            self.charger_donnees()
+            
+            QMessageBox.information(self, "Succès", f"L'artefact '{nouvel_objet['nom']}' a été consigné dans le Grimoire !")
 
     def afficher_details_panneau(self, item):
         """Met à jour le panneau latéral de droite avec les infos de la carte cliquée"""
