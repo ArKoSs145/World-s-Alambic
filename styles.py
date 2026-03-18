@@ -1,6 +1,8 @@
 # ==========================================
 # 🎨 PALETTE DE COULEURS (DESIGN SYSTEM)
 # ==========================================
+
+
 BG_MAIN = "#121212"       # Fond principal (Charbon)
 BG_SURFACE = "#1F2937"    # Fond des listes et menus
 BG_HOVER = "#374151"      # Fond au survol
@@ -40,6 +42,11 @@ STYLE_INPUTS_BOUTONS = f"""
         border-radius: 5px; font-weight: bold; 
     }}
     QPushButton:hover {{ background-color: {ACCENT_CYAN}; color: {BG_MAIN}; }}
+    QPushButton:checked {{
+        background-color: {ACCENT_GOLD}; 
+        color: {BG_MAIN}; 
+        border: 1px solid {ACCENT_GOLD}; 
+    }}
 """
 
 STYLE_LISTES = f"""

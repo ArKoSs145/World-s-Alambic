@@ -1,4 +1,7 @@
-from PyQt6.QtWidgets import QDialog, QFormLayout, QLineEdit, QTextEdit, QPushButton
+from PyQt6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QTextEdit, QPushButton, 
+                             QVBoxLayout, QHBoxLayout, QLabel, QFrame, QGridLayout, 
+                             QScrollArea, QWidget)
+from PyQt6.QtCore import Qt
 
 class CreationDialog(QDialog):
     def __init__(self, ingredients, parent=None):
@@ -62,4 +65,103 @@ class CreationDialog(QDialog):
             "quantite": self.quantite_input.text(),
             "desc": self.desc_input.toPlainText(),
             "ingredients": self.ingredients_utilises # 🪄 La fameuse recette sauvegardée ici !
+        }
+
+class FilterDialog(QDialog):
+    def __init__(self, tags_list, types_list, prov_list, filtres_actuels, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("⚙️ Filtres Avancés de l'Alambic")
+        self.setMinimumWidth(550)
+        self.setMinimumHeight(450)
+
+        # Dictionnaires pour mémoriser l'état de chaque bouton
+        self.btn_tags = {}
+        self.btn_types = {}
+        self.btn_prov = {}
+
+        main_layout = QVBoxLayout(self)
+
+        # --- Zone de défilement (Scroll Area) si on a beaucoup de filtres ---
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(scroll_content)
+
+        # --- Création de nos 3 sections stylisées ---
+        self.creer_section(scroll_layout, "🏷️ Tags Élémentaires", tags_list, self.btn_tags, filtres_actuels.get('tags', []))
+        self.creer_section(scroll_layout, "📦 Types d'Objets", types_list, self.btn_types, filtres_actuels.get('types', []))
+        self.creer_section(scroll_layout, "🌍 Provenances", prov_list, self.btn_prov, filtres_actuels.get('provenances', []))
+
+        scroll_layout.addStretch() # Pousse tout vers le haut proprement
+        scroll.setWidget(scroll_content)
+        main_layout.addWidget(scroll)
+
+        # --- Boutons d'action (Appliquer / Reset) ---
+        btn_layout = QHBoxLayout()
+        btn_reset = QPushButton("Réinitialiser")
+        btn_apply = QPushButton("Appliquer les filtres")
+
+        btn_reset.clicked.connect(self.reset_filters)
+        btn_apply.clicked.connect(self.accept)
+
+        btn_layout.addWidget(btn_reset)
+        btn_layout.addWidget(btn_apply)
+        main_layout.addLayout(btn_layout)
+
+    def creer_section(self, parent_layout, titre, elements, btn_dict, actifs):
+        """Créé un Titre, une ligne de séparation, et une grille de boutons"""
+        # 1. En-tête (Titre + Ligne)
+        header_layout = QHBoxLayout()
+        lbl_titre = QLabel(titre)
+        lbl_titre.setStyleSheet("font-weight: bold; color: #D4AF37; font-size: 14px;")
+        
+        ligne = QFrame()
+        ligne.setFrameShape(QFrame.Shape.HLine)
+        ligne.setStyleSheet("background-color: #4A5568;")
+
+        header_layout.addWidget(lbl_titre)
+        header_layout.addWidget(ligne, 1) # Le "1" permet à la ligne de s'étirer à l'infini
+        parent_layout.addLayout(header_layout)
+
+        # 2. Grille de boutons (4 colonnes maximum)
+        grid = QGridLayout()
+        grid.setSpacing(8)
+        row, col = 0, 0
+        max_cols = 4 
+
+        for element in sorted(elements):
+            if not element: continue
+            
+            btn = QPushButton(element)
+            btn.setCheckable(True) # Rend le bouton "cochable" (On/Off)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+
+            if element in actifs:
+                btn.setChecked(True) # Si le filtre était déjà actif, on l'enfonce
+
+            grid.addWidget(btn, row, col)
+            btn_dict[element] = btn
+
+            col += 1
+            if col >= max_cols:
+                col = 0
+                row += 1
+
+        parent_layout.addLayout(grid)
+        parent_layout.addSpacing(20) # Espace avant la section suivante
+
+    def reset_filters(self):
+        """Décoche tous les boutons"""
+        for btn in self.btn_tags.values(): btn.setChecked(False)
+        for btn in self.btn_types.values(): btn.setChecked(False)
+        for btn in self.btn_prov.values(): btn.setChecked(False)
+
+    def get_filters(self):
+        """Renvoie un dictionnaire avec uniquement les noms des boutons enfoncés"""
+        return {
+            'tags': [name for name, btn in self.btn_tags.items() if btn.isChecked()],
+            'types': [name for name, btn in self.btn_types.items() if btn.isChecked()],
+            'provenances': [name for name, btn in self.btn_prov.items() if btn.isChecked()]
         }

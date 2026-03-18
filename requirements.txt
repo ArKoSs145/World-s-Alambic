@@ -1,0 +1,2 @@
+# Bibliothèques pour l'interface graphique du World's Alambic
+PyQt6>=6.5.0

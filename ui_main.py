@@ -1,10 +1,10 @@
 from PyQt6.QtWidgets import (QMainWindow, QTabWidget, QWidget, QVBoxLayout, 
                              QHBoxLayout, QListWidget, QPushButton, QMessageBox, 
                              QAbstractItemView, QDialog, QLabel, QListWidgetItem,
-                             QLineEdit, QComboBox)
+                             QLineEdit, QComboBox, QMenu)
 from PyQt6.QtCore import Qt, QSize
 from data_manager import DataManager
-from ui_dialogs import CreationDialog
+from ui_dialogs import CreationDialog, FilterDialog
 import re
 
 TAG_COLORS = {
@@ -59,8 +59,10 @@ class ItemCard(QWidget):
         super().__init__()
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True) # Active le style de fond
 
-        self.type_item_exact = type_item
-        
+        self.type_item_exact = type_item 
+        self.provenance_exact = provenance
+        self.tags_exact = tags
+
         if ingredients is None:
             ingredients = []
             
@@ -113,7 +115,7 @@ class WorldsAlambicApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("World's Alambic - L'Œuvre au Noir")
-        self.setGeometry(100, 100, 1000, 600)
+        self.setGeometry(100, 100, 1500, 900)
         
         self.db = DataManager()
 
@@ -128,35 +130,143 @@ class WorldsAlambicApp(QMainWindow):
 
         self.setup_grimoire_tab()
         self.setup_atelier_tab()
+        self.filtres_actifs = {'tags': [], 'types': [], 'provenances': []}
         self.charger_donnees() 
 
     def setup_grimoire_tab(self):
-        layout = QVBoxLayout()
-
-        top_bar_layout = QHBoxLayout()
+        # --- LAYOUT PRINCIPAL (Division Gauche/Droite) ---
+        main_layout = QHBoxLayout()
         
+        # === PARTIE GAUCHE : La Liste et les Filtres (70%) ===
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        
+        top_bar_layout = QHBoxLayout()
         self.search_bar = QLineEdit()
-        self.search_bar.setPlaceholderText("🔍 Rechercher par nom, tag, provenance...")
+        self.search_bar.setPlaceholderText("🔍 Rechercher par nom, tag...")
         self.search_bar.textChanged.connect(self.filtrer_grimoire)
-
-        self.filter_combo = QComboBox()
-        self.filter_combo.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.filter_combo.currentTextChanged.connect(self.filtrer_grimoire)
-
-        top_bar_layout.addWidget(self.search_bar,3)
-        top_bar_layout.addWidget(self.filter_combo,1)
+        
+        self.btn_filter = QPushButton("⚙️ Filtres")
+        self.btn_filter.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_filter.clicked.connect(self.ouvrir_popup_filtres)
+        
+        top_bar_layout.addWidget(self.search_bar, 4)
+        top_bar_layout.addWidget(self.btn_filter, 1)
         
         self.db_list = QListWidget()
         self.db_list.setObjectName("inventory_list") 
-
-        self.db_list.setFlow(QListWidget.Flow.LeftToRight) # Affichage de gauche à droite
-        self.db_list.setWrapping(True)                     # Retour à la ligne automatique
-        self.db_list.setResizeMode(QListWidget.ResizeMode.Adjust) # Ajustement fluide
-        self.db_list.setSpacing(8)                         # Espace entre les cartes
+        self.db_list.setFlow(QListWidget.Flow.LeftToRight)
+        self.db_list.setWrapping(True)
+        self.db_list.setResizeMode(QListWidget.ResizeMode.Adjust)
+        self.db_list.setSpacing(8)
         
-        layout.addLayout(top_bar_layout)
-        layout.addWidget(self.db_list)
-        self.tab_grimoire.setLayout(layout)
+        # 👇 NOUVEAU : On écoute le clic gauche sur une carte pour afficher les détails !
+        self.db_list.itemClicked.connect(self.afficher_details_panneau)
+        
+        left_layout.addLayout(top_bar_layout)
+        left_layout.addWidget(self.db_list)
+        
+        # === PARTIE DROITE : Le Panneau d'Inspection (30%) ===
+        self.details_panel = QWidget()
+        self.details_panel.setStyleSheet("""
+            QWidget { background-color: #1F2937; border-radius: 8px; border: 1px solid #4A5568; }
+            QLabel { border: none; background: transparent; }
+        """)
+        details_layout = QVBoxLayout(self.details_panel)
+        details_layout.setContentsMargins(15, 15, 15, 15)
+        details_layout.setSpacing(10)
+
+        # Les textes du panneau (vides par défaut)
+        self.lbl_detail_nom = QLabel("Sélectionnez un artefact")
+        self.lbl_detail_nom.setStyleSheet("font-size: 18px; color: #D4AF37; font-weight: bold;")
+        self.lbl_detail_nom.setWordWrap(True)
+        
+        self.lbl_detail_stats = QLabel("Parcourez votre Grimoire pour révéler les secrets de vos créations.")
+        self.lbl_detail_stats.setStyleSheet("color: #9CA3AF; font-size: 12px; font-style: italic;")
+        self.lbl_detail_stats.setWordWrap(True)
+        
+        self.lbl_detail_desc = QLabel("")
+        self.lbl_detail_desc.setStyleSheet("color: #E2E8F0; font-size: 13px; margin-top: 10px;")
+        self.lbl_detail_desc.setWordWrap(True)
+        self.lbl_detail_desc.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        # Le bouton de destruction (caché par défaut)
+        self.btn_supprimer = QPushButton("❌ Détruire cet artefact")
+        self.btn_supprimer.setStyleSheet("background-color: #7F1D1D; color: white; border: 1px solid #EF4444; padding: 8px;")
+        self.btn_supprimer.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_supprimer.hide() 
+        self.btn_supprimer.clicked.connect(self.supprimer_artefact_selectionne)
+
+        # Ajout au layout du panneau
+        details_layout.addWidget(self.lbl_detail_nom)
+        details_layout.addWidget(self.lbl_detail_stats)
+        details_layout.addWidget(self.lbl_detail_desc, 1) # Le "1" pousse le bouton vers le bas
+        details_layout.addWidget(self.btn_supprimer)
+
+        # === ASSEMBLAGE FINAL ===
+        main_layout.addWidget(left_panel, 7) # 70% de la largeur
+        main_layout.addWidget(self.details_panel, 3) # 30% de la largeur
+        
+        self.tab_grimoire.setLayout(main_layout)
+        
+        # Variable pour mémoriser l'objet en cours de lecture
+        self.artefact_en_lecture = None
+
+    def afficher_details_panneau(self, item):
+        """Met à jour le panneau latéral de droite avec les infos de la carte cliquée"""
+        nom_objet = item.data(Qt.ItemDataRole.UserRole)
+        self.artefact_en_lecture = nom_objet # On mémorise quel objet est affiché
+        
+        # On cherche l'objet dans la base de données
+        item_data = next((i for i in self.db.data if i.get('nom') == nom_objet), None)
+        if not item_data:
+            return
+
+        # 1. Mise à jour du Titre
+        self.lbl_detail_nom.setText(item_data['nom'])
+        
+        # 2. Mise à jour des Stats
+        stats = f"Type : {item_data.get('type', 'Inconnu')}\n"
+        stats += f"Tags : {item_data.get('tags', 'Aucun')}\n"
+        stats += f"Provenance : {item_data.get('provenance', 'Inconnue')}\n"
+        stats += f"Quantité : {item_data.get('quantite', 1)}"
+        self.lbl_detail_stats.setText(stats)
+
+        # 3. Mise à jour de la Description et Recette
+        desc = item_data.get('desc', "Aucune description n'a été notée.")
+        ingredients = item_data.get('ingredients', [])
+        recette = ", ".join(ingredients) if ingredients else "Création spontanée"
+        
+        texte_desc = f"<b>📖 Description :</b><br>{desc}<br><br>"
+        texte_desc += f"<b>🧪 Recette :</b><br>{recette}"
+        self.lbl_detail_desc.setText(texte_desc)
+
+        # 4. On affiche enfin le bouton de suppression !
+        self.btn_supprimer.show()
+
+    def supprimer_artefact_selectionne(self):
+        """Supprime l'objet actuellement affiché dans le panneau"""
+        if not self.artefact_en_lecture:
+            return
+
+        reponse = QMessageBox.question(
+            self, 
+            "Destruction d'objet", 
+            f"Es-tu sûr de vouloir incinérer '{self.artefact_en_lecture}' ?\nCette action est irréversible.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reponse == QMessageBox.StandardButton.Yes:
+            self.db.delete_item(self.artefact_en_lecture) 
+            self.charger_donnees()
+            
+            # On remet le panneau à zéro après la suppression
+            self.lbl_detail_nom.setText("Sélectionnez un artefact")
+            self.lbl_detail_stats.setText("Parcourez votre Grimoire pour révéler les secrets de vos créations.")
+            self.lbl_detail_desc.setText("")
+            self.btn_supprimer.hide()
+            self.artefact_en_lecture = None
 
     def setup_atelier_tab(self):
         main_layout = QHBoxLayout()
@@ -182,8 +292,8 @@ class WorldsAlambicApp(QMainWindow):
         right_panel.addWidget(self.cauldron_zone)
         right_panel.addWidget(self.btn_craft)
 
-        main_layout.addWidget(self.inventory_list, 2)
-        main_layout.addLayout(right_panel, 3)
+        main_layout.addWidget(self.inventory_list, 6)
+        main_layout.addLayout(right_panel, 4)
         self.tab_atelier.setLayout(main_layout)
 
     def charger_donnees(self):
@@ -214,8 +324,32 @@ class WorldsAlambicApp(QMainWindow):
             self.db_list.setItemWidget(list_item_db, carte_db)
             self.inventory_list.setItemWidget(list_item_inv, carte_inv)
 
-    def filtrer_grimoire(self, texte_recherche):
-        texte_recherche = texte_recherche.lower()
+    def ouvrir_popup_filtres(self):
+        types_uniques = set()
+        prov_uniques = set()
+        tags_uniques = set()
+        
+        for item in self.db.data:
+            types_uniques.add(item.get('type', 'Inconnu'))
+            prov_uniques.add(item.get('provenance', 'Inconnue'))
+            
+            # On découpe les mots pour séparer 'Feu' et 'Plante'
+            mots = [m.capitalize() for m in re.findall(r'\b\w+\b', str(item.get('tags', '')))]
+            tags_uniques.update(mots)
+        
+        dialog = FilterDialog(list(tags_uniques), list(types_uniques), list(prov_uniques), self.filtres_actifs, self)
+        
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.filtres_actifs = dialog.get_filters()
+            self.filtrer_grimoire()
+
+    def filtrer_grimoire(self, *args):
+        texte_recherche = self.search_bar.text().lower()
+        
+        # On récupère les listes de boutons cochés
+        filtres_tags = self.filtres_actifs.get('tags', [])
+        filtres_types = self.filtres_actifs.get('types', [])
+        filtres_prov = self.filtres_actifs.get('provenances', [])
         
         for i in range(self.db_list.count()):
             item = self.db_list.item(i)
@@ -225,10 +359,105 @@ class WorldsAlambicApp(QMainWindow):
                 nom = widget_carte.lbl_nom.text().lower()
                 details = widget_carte.lbl_details.text().lower()
                 
-                if texte_recherche in nom or texte_recherche in details:
+                # On récupère les tags de cette carte sous forme de liste de mots
+                tags_carte = [m.capitalize() for m in re.findall(r'\b\w+\b', str(widget_carte.tags_exact))]
+                
+                # --- LES CONDITIONS (Si la liste est vide, on accepte tout) ---
+                ok_texte = (texte_recherche in nom) or (texte_recherche in details)
+                ok_type = (not filtres_types) or (widget_carte.type_item_exact in filtres_types)
+                ok_prov = (not filtres_prov) or (widget_carte.provenance_exact in filtres_prov)
+                
+                # Est-ce que la carte possède AU MOINS UN des tags cochés ?
+                ok_tags = (not filtres_tags) or any(t in tags_carte for t in filtres_tags)
+                
+                if ok_texte and ok_type and ok_prov and ok_tags:
                     item.setHidden(False)
                 else:
                     item.setHidden(True)
+
+    def afficher_details_carte(self, nom_objet):
+        """Ouvre une fenêtre pour lire toutes les informations d'un objet"""
+        # 1. On cherche l'objet complet dans la base de données
+        item_data = next((item for item in self.db.data if item.get('nom') == nom_objet), None)
+        
+        if not item_data:
+            return
+
+        # 2. On récupère les infos (avec des valeurs par défaut si elles sont vides)
+        desc = item_data.get('desc', "Aucune description n'a été notée pour cet artefact mystérieux...")
+        ingredients = item_data.get('ingredients', [])
+        
+        if ingredients:
+            recette = ", ".join(ingredients)
+        else:
+            recette = "Aucune (Trouvé tel quel)"
+
+        # 3. On construit le texte final
+        texte_complet = f"""
+        <b>Nom :</b> {item_data.get('nom')}
+        <b>Type :</b> {item_data.get('type', 'Inconnu')}
+        <b>Tags :</b> {item_data.get('tags', 'Aucun')}
+        <b>Provenance :</b> {item_data.get('provenance', 'Inconnue')}
+        <b>En stock :</b> {item_data.get('quantite', 1)}
+        
+        <br><br><b>📖 Description :</b><br>
+        <i>{desc}</i>
+        
+        <br><br><b>🧪 Recette d'origine :</b><br>
+        {recette}
+        """
+
+        # 4. On affiche la pop-up de lecture
+        msg = QMessageBox(self)
+        msg.setWindowTitle(f"Détails : {nom_objet}")
+        msg.setText(texte_complet)
+        
+        # Petit style pour que la pop-up reste dans le thème sombre de l'app
+        msg.setStyleSheet("""
+            QMessageBox { background-color: #2D3748; } 
+            QLabel { color: #E2E8F0; font-size: 13px; } 
+            QPushButton { background-color: #374151; color: white; padding: 5px 15px; border-radius: 3px; }
+        """)
+        msg.exec()
+
+    def menu_contexte_grimoire(self, position):
+        """Affiche un menu lors d'un clic droit sur une carte du grimoire"""
+        item_clique = self.db_list.itemAt(position)
+        
+        if not item_clique:
+            return 
+
+        nom_objet = item_clique.data(Qt.ItemDataRole.UserRole)
+
+        menu = QMenu()
+        menu.setStyleSheet("""
+            QMenu { background-color: #1F2937; color: white; border: 1px solid #D4AF37; padding: 5px; } 
+            QMenu::item { padding: 5px 20px; }
+            QMenu::item:selected { background-color: #374151; color: #D4AF37; }
+        """)
+        
+        # 👇 NOUVEAU : Option pour voir les détails
+        action_details = menu.addAction("📖 Voir les détails")
+        menu.addSeparator() # Ligne de séparation visuelle
+        action_supprimer = menu.addAction("❌ Supprimer du Grimoire")
+        
+        action_choisie = menu.exec(self.db_list.mapToGlobal(position))
+
+        # --- GESTION DES CLICS ---
+        if action_choisie == action_details:
+            self.afficher_details_carte(nom_objet) # On lance la nouvelle fonction !
+            
+        elif action_choisie == action_supprimer:
+            reponse = QMessageBox.question(
+                self, 
+                "Destruction d'objet", 
+                f"Es-tu sûr de vouloir incinérer '{nom_objet}' ?\nCette action est irréversible.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            
+            if reponse == QMessageBox.StandardButton.Yes:
+                self.db.delete_item(nom_objet) 
+                self.charger_donnees()
 
     def lancer_creation(self):
         if self.cauldron_zone.count() == 0:
