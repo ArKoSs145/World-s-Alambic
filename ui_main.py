@@ -1,12 +1,12 @@
 from PyQt6.QtWidgets import (QMainWindow, QTabWidget, QWidget, QVBoxLayout, 
                              QHBoxLayout, QListWidget, QPushButton, QMessageBox, 
-                             QLabel, QListWidgetItem, QLineEdit, QDialog)
+                             QLabel, QListWidgetItem, QLineEdit, QFrame) # <-- Ajout de QFrame
 from PyQt6.QtCore import Qt, QSize
 import re
 
 from data_manager import DataManager
-from ui_dialogs import CreationDialog, FilterDialog
-from ui_components import CauldronWidget, ItemCard # <-- Import depuis le nouveau fichier !
+from ui_dialogs import CreationPanel, FilterPanel # <-- Les nouveaux noms !
+from ui_components import CauldronWidget, ItemCard 
 
 class WorldsAlambicApp(QMainWindow):
     def __init__(self):
@@ -28,6 +28,54 @@ class WorldsAlambicApp(QMainWindow):
         self.setup_atelier_tab()
         self.filtres_actifs = {'tags': [], 'types': [], 'provenances': []}
         self.charger_donnees() 
+        
+        # 👇 NOUVEAU : LE SYSTÈME D'OVERLAY INTEGÉ (Voile Noir) 👇
+        self.overlay = QFrame(self)
+        self.overlay.setStyleSheet("background-color: rgba(0, 0, 0, 200);") # Noir semi-transparent
+        self.overlay.hide()
+        
+        self.overlay_layout = QVBoxLayout(self.overlay)
+        self.overlay_layout.setAlignment(Qt.AlignmentFlag.AlignCenter) # Pour centrer le panneau au milieu de l'écran
+
+    # 👇 NOUVEAU : Permet au voile noir de grandir quand on redimensionne la fenêtre
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, 'overlay'):
+            self.overlay.resize(event.size())
+            
+    def afficher_overlay(self, widget_panneau):
+        """Nettoie l'overlay et affiche un nouveau panneau au centre avec une taille fixe"""
+        # 1. On nettoie l'overlay
+        for i in reversed(range(self.overlay_layout.count())): 
+            widget_a_retirer = self.overlay_layout.itemAt(i).widget()
+            if widget_a_retirer:
+                widget_a_retirer.setParent(None)
+                
+        # 2. 👇 LE NOUVEAU CONTENEUR FIXE (La popup d'or) 👇
+        # On crée un widget intermédiaire qui sera notre boîte flottante
+        self.panel_container = QFrame()
+        
+        # Petit style pour cette boîte fixe (Thème d'or)
+        self.panel_container.setStyleSheet("""
+            QFrame { background-color: #1F2937; border-radius: 8px; border: 2px solid #D4AF37; }
+        """)
+        
+        # --- TAILLE FIXE DU PANEL (L'effet popup est ici !) ---
+        self.panel_container.setFixedSize(600, 600) 
+        
+        # On met un layout dans ce conteneur pour y placer votre panneau
+        container_layout = QVBoxLayout(self.panel_container)
+        container_layout.setContentsMargins(15, 15, 15, 15) # Marges intérieures (Paddings)
+        container_layout.addWidget(widget_panneau) # On ajoute VOTRE panneau
+        
+        # 3. On ajoute ce conteneur fixe à l'overlay principal (qui est déjà centré)
+        self.overlay_layout.addWidget(self.panel_container)
+        self.overlay.raise_() 
+        self.overlay.show()
+
+    def fermer_overlay(self):
+        """Cache le voile noir"""
+        self.overlay.hide()
 
     def setup_grimoire_tab(self):
         main_layout = QHBoxLayout()
@@ -196,25 +244,19 @@ class WorldsAlambicApp(QMainWindow):
         types_uniques = set()
         prov_uniques = set()
         tags_uniques = set()
-        
         for item in self.db.data:
             types_uniques.add(item.get('type', 'Inconnu'))
             prov_uniques.add(item.get('provenance', 'Inconnue'))
             mots = [m.capitalize() for m in re.findall(r'\b\w+\b', str(item.get('tags', '')))]
             tags_uniques.update(mots)
         
-        dialog = FilterDialog(list(tags_uniques), list(types_uniques), list(prov_uniques), self.filtres_actifs, self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            self.filtres_actifs = dialog.get_filters()
-            self.filtrer_grimoire()
+        # On génère le panneau et on l'affiche dans l'overlay !
+        panneau = FilterPanel(list(tags_uniques), list(types_uniques), list(prov_uniques), self.filtres_actifs, self)
+        self.afficher_overlay(panneau)
 
     def ajouter_artefact_manuel(self):
-        dialog = CreationDialog([], self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            nouvel_objet = dialog.get_data()
-            self.db.save_item(nouvel_objet)
-            self.charger_donnees()
-            QMessageBox.information(self, "Succès", f"L'artefact '{nouvel_objet['nom']}' a été consigné !")
+        panneau = CreationPanel([], self)
+        self.afficher_overlay(panneau)
 
     def afficher_details_panneau(self, item):
         nom_objet = item.data(Qt.ItemDataRole.UserRole)
@@ -276,44 +318,47 @@ class WorldsAlambicApp(QMainWindow):
             self.artefact_en_lecture = None
 
     def modifier_artefact_selectionne(self):
-        """Ouvre la fenêtre pré-remplie pour modifier l'objet actuel"""
         if not self.artefact_en_lecture: return
-
-        # On récupère toutes les données de l'objet actuellement affiché
         item_data = next((i for i in self.db.data if i.get('nom') == self.artefact_en_lecture), None)
         if not item_data: return
 
-        # On ouvre notre pop-up intelligente en lui passant l'objet
-        dialog = CreationDialog([], self, item_to_edit=item_data)
-        
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            nouvel_objet = dialog.get_data()
-            
-            # On met à jour la base de données
-            self.db.update_item(self.artefact_en_lecture, nouvel_objet)
-            self.charger_donnees()
-            
-            # On remet le panneau à zéro pour forcer l'utilisateur à recliquer (plus sécurisé)
-            self.lbl_detail_nom.setText("Sélectionnez une carte")
-            self.lbl_detail_stats.setText("Parcourez votre Grimoire pour révéler les secrets de vos créations.")
-            self.lbl_detail_desc.setText("")
-            self.btn_modifier.hide()
-            self.btn_supprimer.hide()
-            self.artefact_en_lecture = None
-            
-            QMessageBox.information(self, "Succès", f"La carte a été mis à jour avec succès !")
+        panneau = CreationPanel([], self, item_to_edit=item_data)
+        self.afficher_overlay(panneau)
 
     def lancer_creation(self):
         if self.cauldron_zone.count() == 0:
             QMessageBox.warning(self, "Alambic Vide", "Tu dois mettre des ingrédients dans l'alambic !")
             return
-
         ingredients = [self.cauldron_zone.item(i).text() for i in range(self.cauldron_zone.count())]
-        dialog = CreationDialog(ingredients, self)
         
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            nouvel_objet = dialog.get_data()
-            self.db.save_item(nouvel_objet)
-            self.charger_donnees()
-            self.cauldron_zone.clear()
-            QMessageBox.information(self, "Succès", f"'{nouvel_objet['nom']}' a été ajouté au Grimoire !")
+        panneau = CreationPanel(ingredients, self)
+        self.afficher_overlay(panneau)
+
+    def traiter_sauvegarde_artefact(self, donnees_artefact, nom_original=None):
+        """Appelé par le CreationPanel quand on clique sur Sauvegarder"""
+        if nom_original:
+            self.db.update_item(nom_original, donnees_artefact)
+            message = "L'artefact a été mis à jour avec succès !"
+        else:
+            self.db.save_item(donnees_artefact)
+            message = f"'{donnees_artefact['nom']}' a été ajouté au Grimoire !"
+            
+        self.charger_donnees()
+        self.cauldron_zone.clear() # On vide l'alambic au cas où on venait de là
+        self.fermer_overlay()
+        
+        # Reset de l'inspection
+        self.lbl_detail_nom.setText("Sélectionnez un artefact")
+        self.lbl_detail_stats.setText("Parcourez votre Grimoire pour révéler les secrets de vos créations.")
+        self.lbl_detail_desc.setText("")
+        self.btn_modifier.hide()
+        self.btn_supprimer.hide()
+        self.artefact_en_lecture = None
+        
+        QMessageBox.information(self, "Succès", message)
+
+    def traiter_application_filtres(self, filtres):
+        """Appelé par le FilterPanel quand on clique sur Appliquer"""
+        self.filtres_actifs = filtres
+        self.filtrer_grimoire()
+        self.fermer_overlay()

@@ -13,7 +13,8 @@ TAG_COLORS = {
     'glace': '#7DD3FC',    
     'lumiere': '#FEF08A',  
     'ombre': '#7C3AED',    
-    'magie': '#D946EF'     
+    'magie': '#D946EF',     
+    'minerai': '#A1A1AA'
 }
 
 # --- CLASSE : LE CHAUDRON INTELLIGENT ---

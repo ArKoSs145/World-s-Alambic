@@ -78,6 +78,8 @@
         "tags": "Minerai, Colle",
         "quantite": "1",
         "desc": "Pourdre qui permet de lier les autre Ingrédients dans une potion",
-        "ingredients": []
+        "ingredients": [
+            "Élément naturel"
+        ]
     }
 ]
