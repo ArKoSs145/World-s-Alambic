@@ -3,44 +3,73 @@ from PyQt6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QTextEdit, QPushBu
                              QScrollArea, QWidget)
 from PyQt6.QtCore import Qt
 
+from PyQt6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QTextEdit, QPushButton, 
+                             QVBoxLayout, QHBoxLayout, QLabel, QFrame, QGridLayout, 
+                             QScrollArea, QWidget)
+from PyQt6.QtCore import Qt
+
+from PyQt6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QTextEdit, QPushButton, 
+                             QVBoxLayout, QHBoxLayout, QLabel, QFrame, QGridLayout, 
+                             QScrollArea, QWidget)
+from PyQt6.QtCore import Qt
+
 class CreationDialog(QDialog):
-    def __init__(self, ingredients, parent=None):
+    def __init__(self, ingredients, parent=None, item_to_edit=None):
         super().__init__(parent)
-        self.setWindowTitle("✨ Nouvelle Découverte Alchimique ✨")
+        
+        titre = "✏️ Modification de la Carte" if item_to_edit else "✨ Nouvelle Découverte Alchimique ✨"
+        self.setWindowTitle(titre)
         self.setMinimumWidth(400)
         
-        # 1. On stocke les ingrédients en mémoire pour la recette finale
-        self.ingredients_utilises = ingredients
+        if item_to_edit:
+            self.ingredients_utilises = item_to_edit.get('ingredients', [])
+        else:
+            self.ingredients_utilises = ingredients
 
         layout = QFormLayout()
 
-        # Ingrédients utilisés (affichage en lecture seule pour rappel visuel)
-        ingredients_text = ", ".join(ingredients)
-        if not ingredients_text:
-            ingredients_text = "Aucun (Création spontanée)"
-        layout.addRow("Ingrédients utilisés :", QLineEdit(ingredients_text, readOnly=True))
+        # 👇 NOUVEAU : Le champ des ingrédients est maintenant modifiable !
+        self.ingredients_input = QLineEdit()
+        
+        # On nettoie la liste s'il y avait "Recette inconnue" pour ne pas polluer le champ à la modification
+        if self.ingredients_utilises == ["Recette inconnue"]:
+            ingredients_text = ""
+        else:
+            ingredients_text = ", ".join(self.ingredients_utilises)
+            
+        self.ingredients_input.setText(ingredients_text)
+        self.ingredients_input.setPlaceholderText("Ex: Épée, Fleur de Feu (Vide = Recette inconnue)")
+        layout.addRow("Ingrédients :", self.ingredients_input)
 
-        # --- CHAMPS DU FORMULAIRE (Adaptés à tes données) ---
+        # --- CHAMPS DU FORMULAIRE ---
         self.nom_input = QLineEdit()
-        self.nom_input.setPlaceholderText("Ex: Potion de Soin Mineure")
-        
         self.provenance_input = QLineEdit()
-        self.provenance_input.setText("Atelier Alchimique") # Valeur par défaut logique pour un craft
-        self.provenance_input.setPlaceholderText("Ex: Nature, Atelier Alchimique...")
-        
         self.type_input = QLineEdit()
-        self.type_input.setPlaceholderText("Ex: Item, Potion, Arme...")
-        
         self.tags_input = QLineEdit()
-        self.tags_input.setPlaceholderText("Ex: [Soin, Magie]")
-        
         self.quantite_input = QLineEdit()
-        self.quantite_input.setText("1") # On crée généralement 1 objet à la fois par défaut
-        
         self.desc_input = QTextEdit()
-        self.desc_input.setPlaceholderText("Description et effets de l'objet...")
 
-        # Ajout des champs au layout
+        if item_to_edit:
+            self.nom_input.setText(item_to_edit.get('nom', ''))
+            self.provenance_input.setText(item_to_edit.get('provenance', ''))
+            self.type_input.setText(item_to_edit.get('type', ''))
+            
+            tags_val = item_to_edit.get('tags', '')
+            if isinstance(tags_val, list):
+                tags_val = ", ".join(tags_val)
+            self.tags_input.setText(str(tags_val).replace('[', '').replace(']', '').replace("'", ""))
+            
+            self.quantite_input.setText(str(item_to_edit.get('quantite', '1')))
+            self.desc_input.setPlainText(item_to_edit.get('desc', ''))
+        else:
+            self.nom_input.setPlaceholderText("Ex: Potion de Soin Mineure")
+            self.provenance_input.setText("Atelier Alchimique")
+            self.provenance_input.setPlaceholderText("Ex: Nature, Atelier Alchimique...")
+            self.type_input.setPlaceholderText("Ex: Item, Potion, Arme...")
+            self.tags_input.setPlaceholderText("Ex: Soin, Magie")
+            self.quantite_input.setText("1")
+            self.desc_input.setPlaceholderText("Description et effets de l'objet...")
+
         layout.addRow("Nom :", self.nom_input)
         layout.addRow("Provenance :", self.provenance_input)
         layout.addRow("Type :", self.type_input)
@@ -48,15 +77,26 @@ class CreationDialog(QDialog):
         layout.addRow("Quantité :", self.quantite_input)
         layout.addRow("Description :", self.desc_input)
 
-        # Bouton de validation
-        self.btn_save = QPushButton("Enregistrer dans le Grimoire")
+        texte_bouton = "💾 Sauvegarder les modifications" if item_to_edit else "Enregistrer dans le Grimoire"
+        self.btn_save = QPushButton(texte_bouton)
         self.btn_save.clicked.connect(self.accept)
         layout.addRow(self.btn_save)
 
         self.setLayout(layout)
 
     def get_data(self):
-        """Retourne les données saisies sous forme de dictionnaire compatible avec data.json"""
+        """Retourne les données saisies sous forme de dictionnaire"""
+        
+        # 👇 NOUVEAU : On lit le champ texte et on le transforme en liste Python !
+        ingredients_bruts = self.ingredients_input.text().strip()
+        
+        if ingredients_bruts:
+            # On coupe le texte à chaque virgule pour créer une liste proprement
+            liste_ingredients = [ing.strip() for ing in ingredients_bruts.split(',') if ing.strip()]
+        else:
+            # Si le champ est totalement vide, on met notre valeur par défaut
+            liste_ingredients = ["Recette inconnue"]
+            
         return {
             "nom": self.nom_input.text(),
             "provenance": self.provenance_input.text(),
@@ -64,7 +104,7 @@ class CreationDialog(QDialog):
             "tags": self.tags_input.text(),
             "quantite": self.quantite_input.text(),
             "desc": self.desc_input.toPlainText(),
-            "ingredients": self.ingredients_utilises # 🪄 La fameuse recette sauvegardée ici !
+            "ingredients": liste_ingredients # On sauvegarde la nouvelle liste générée !
         }
 
 class FilterDialog(QDialog):

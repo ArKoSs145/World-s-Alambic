@@ -1,55 +1,83 @@
 [
     {
-        "nom": "Fleur de Feu",
-        "provenance": "Nature",
-        "type": "Item",
+        "nom": "Potion de soin mineure",
+        "provenance": "Alambic",
+        "type": "Potion",
         "tags": [
-            "Feu",
-            "Plante"
-        ],
-        "quantite": "4",
-        "desc": "Une fleure enflammée.",
-        "ingredients": []
-    },
-    {
-        "nom": "Cailloux",
-        "provenance": "Nature",
-        "type": "Item",
-        "tags": [
-            "Terre",
-            "Solide"
-        ],
-        "quantite": "4",
-        "desc": "Kayou.",
-        "ingredients": []
-    },
-    {
-        "nom": "Épée",
-        "provenance": "Achat/Forge",
-        "type": "Arme",
-        "tags": [
-            "Fer",
-            "Solide",
-            "Tranchant"
-        ],
-        "quantite": "1",
-        "desc": "Average épée random.",
-        "ingredients": []
-    },
-    {
-        "nom": "Épée Enflammée",
-        "provenance": "Atelier Alchimique",
-        "type": "Arme Magique",
-        "tags": [
-            "Feu",
-            "Fer",
+            "Soin",
+            "Mineur",
             "Magie"
         ],
         "quantite": "1",
-        "desc": "Une épée qui brûle ses ennemis.",
+        "desc": "Potion qui soigne quand appliqué sur la blessure",
         "ingredients": [
-            "Épée",
-            "Fleur de Feu"
+            "Base eau",
+            "Sel d'ammoniac",
+            "Écorce de chêne",
+            "Feuille de Chêne"
         ]
+    },
+    {
+        "nom": "Potion de mana mineure",
+        "provenance": "Alambic",
+        "type": "Potion",
+        "tags": [
+            "Mana",
+            "Mineur",
+            "Magie"
+        ],
+        "quantite": "1",
+        "desc": "Potion qui régenère le mana quand consommé",
+        "ingredients": [
+            "Base eau",
+            "Mana",
+            "Pourdre de magnétite",
+            "Champignons luisants"
+        ]
+    },
+    {
+        "nom": "Potion de poison mineure",
+        "provenance": "Alambic",
+        "type": "Potion",
+        "tags": [
+            "Poison",
+            "Mineur",
+            "Magie"
+        ],
+        "quantite": "1",
+        "desc": "Potion qui empoisonne quand consommé",
+        "ingredients": [
+            "Base Huile",
+            "Queue de rat",
+            "Balignes",
+            "Sel d'ammoniac"
+        ]
+    },
+    {
+        "nom": "Potion de paralysie",
+        "provenance": "Alambic",
+        "type": "Potion",
+        "tags": [
+            "Foudre",
+            "Moyen",
+            "Magie"
+        ],
+        "quantite": "1",
+        "desc": "Potion qui taze quand consommé",
+        "ingredients": [
+            "Base eau",
+            "Champignons paralysants",
+            "Pourdre de magnétite",
+            "Pierre de mana"
+        ]
+    },
+    {
+        "nom": "Poudre de Magnétite ",
+        "provenance": "Nature",
+        "type": "Ingrédient",
+        "tags": "Minerai, Colle",
+        "quantite": "1",
+        "desc": "Pourdre qui permet de lier les autre Ingrédients dans une potion",
+        "ingredients": []
     }
 ]
